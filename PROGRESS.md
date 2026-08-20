@@ -72,12 +72,64 @@ CASCADE (software_licence) vs RESTRICT (problem) referential actions.
 - [x] Phase 2 — Routines and roles (`db/03_views.sql`, `db/04_procedures.sql`,
       `db/05_triggers.sql`, `db/06_roles.sql`) — committed
 - [x] Phase 3 — Seed data and queries — SQL written and generator-verified; **awaiting
-      user's live-DB run for the actual checkpoint proof** before Phase 4 starts
-- [ ] Phase 4 — Backend foundation
-- [ ] Phase 5 — Reference data and lookups
-- [ ] Phase 6 — Problem workflow and reports — **CHECKPOINT**
-- [ ] Phase 7 — Frontend
-- [ ] Phase 8 — Hardening, maintenance, packaging — **FINAL CHECKPOINT**
+      user's live-DB run for the actual checkpoint proof**
+- [x] Phase 4 — Backend foundation — Express app, JWT auth, RBAC middleware, Zod
+      validation, central error handler, connection pool against `hd_app` — committed
+- [x] Phase 5 — Reference data and lookups — departments/job-titles/equipment-types/
+      software/staff reads, employee/equipment/problem-type CRUD, caller/equipment
+      lookup for Log a Call — committed
+- [x] Phase 6 — Problem workflow and reports — `sp_log_new_call`/`sp_assign_least_loaded`/
+      `sp_resolve_problem` wired end-to-end, knowledge lookup, four report endpoints over
+      the views — **CHECKPOINT — awaiting live-DB verification, see below**
+- [x] Phase 7 — Frontend — seven screens (Login, Log a Call, Problem List, Problem Detail
+      + escalation modal, Knowledge Lookup, Reports, Admin), React Router, role-gated nav
+      — committed; client builds clean (`npm run build`)
+- [x] Phase 8 — Hardening, maintenance, packaging — Helmet/CORS allowlist/login rate
+      limit already in Phase 4; added `db/maintenance/{backup,restore}.sh`, `db/dump.sql`
+      (concatenated 01–07, regenerate via `cat db/0[1-7]_*.sql > db/dump.sql`), Dockerfiles
+      for `server`/`client`, `docker-compose.yml` extended with `server`+`web` services,
+      root `README.md` — **FINAL CHECKPOINT — awaiting live-DB and browser verification,
+      see below**
+
+## What is verified vs. not (this environment has no Docker and no MySQL client)
+
+Verified in this session:
+- `server` boots cleanly (`node src/app.js` loads with no errors) and its HTTP layer works
+  correctly *without* a database: health check, 401 on missing auth, 400 with field errors
+  on bad login body, and RBAC/validation middleware ordering, all checked with live `curl`
+  requests against a running instance.
+- `client` installs and `npm run build` produces a clean production bundle with no
+  compile/import errors.
+- The seed password hash (`db/seed_generator/generate_seed.js`) verifies against
+  `bcryptjs.compare('Password123!', hash)` — login will work once the seed data is loaded.
+- `docker compose config` was **not** run (no Docker in this environment) — the compose
+  file, both Dockerfiles and `client/nginx.conf` are hand-reviewed but not executed.
+
+**Not verified — needs the user to run it**: every endpoint that touches MySQL (all of
+Phase 5/6's actual behaviour), the full `docker compose up --build` path end-to-end, and
+the app in a browser (README §"Logging in" walks through all four roles). This is the same
+gap noted for Phase 3 — nothing in Phases 4–8 changes that; it compounds it, since the
+whole backend is now new code that has only been syntax/route-checked, never run against
+real rows.
+
+## Suggested verification pass (for whoever has Docker/MySQL)
+
+1. `docker compose up --build`, wait for `server` to report listening.
+2. Log in as `operator1` / `Password123!`, log a call end-to-end (caller lookup, serial
+   lookup showing licence validity, cascading problem-type picker, submit, read back the
+   problem number).
+3. Log in as `operator1` again on a fresh/unassigned problem, escalate via the modal —
+   confirm it lands on the seeded no-specialist-at-this-level fallback cases (problem types
+   19 and 22, per the Phase 3 seed notes above) and assigns correctly.
+3a. As `specialist1..5`, confirm the Problem List defaults to that specialist's own
+   `ASSIGNED` queue, and resolve a problem.
+4. As `analyst1`, check all four report tabs render and the open-by-age date filter works.
+5. As `admin1`, CRUD an employee, an equipment item and a problem type; confirm deleting a
+   referenced row 409s (FK RESTRICT) rather than 500ing.
+6. `db/maintenance/backup.sh` then `restore.sh` against the backup it produces — capture
+   both as evidence per ARCHITECTURE.md §3.8.
+7. `EXPLAIN` the two heaviest report queries before/after `db/02_indexes.sql`'s indexes —
+   this still needs a live database and has not been done in any session so far.
 
 ## Design notes for whoever resumes
 

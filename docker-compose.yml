@@ -26,5 +26,30 @@ services:
     depends_on:
       - db
 
+  server:
+    build: ./server
+    container_name: manzaneque_server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Overrides .env's DB_HOST/DB_PORT (which target the local-Node path,
+      # see README) with the in-network service name/port for this container.
+      DB_HOST: db
+      DB_PORT: 3306
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./client
+    container_name: manzaneque_web
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+
 volumes:
   db_data:
