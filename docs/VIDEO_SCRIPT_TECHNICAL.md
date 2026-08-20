@@ -1,6 +1,6 @@
 # Technical video script
 
-A script to read while screen recording. Total target time is 12 to 15 minutes. Each section gives a target time, where to go, what should be on screen, and the words to say out loud.
+A script to read while screen recording. Total target time is 15 to 18 minutes. Each section gives a target time, where to go, what should be on screen, and the words to say out loud.
 
 Before recording: have the project open in an editor with line numbers turned on, a browser open to the app, and a terminal ready with the running server and client.
 
@@ -16,11 +16,59 @@ SHOW: the project folder structure, top level only.
 
 SAY:
 
-"This is the Manzaneque IT Helpdesk system. It is a coursework build for a Pearson HND database unit. Staff use it to log calls from employees about broken equipment, track those problems, escalate them to a specialist, and resolve them. Underneath, almost all of the real logic lives in the database, not in the application code. Views do the reporting, stored procedures do the multi step operations, and triggers keep some values consistent automatically. I am going to walk through the database first, then the backend that sits on top of it, then show it running."
+"This is the Manzaneque IT Helpdesk system. It is a coursework build for a Pearson HND database unit. Staff use it to log calls from employees about broken equipment, track those problems, escalate them to a specialist, and resolve them. Underneath, almost all of the real logic lives in the database, not in the application code. Views do the reporting, stored procedures do the multi step operations, and triggers keep some values consistent automatically. I am going to walk through the diagrams first, then the database, then the backend that sits on top of it, then show it running."
 
 ---
 
-## 2. The schema
+## 2. Diagrams
+
+Target: 1 minute 30 seconds.
+
+Note before recording this section: these five diagram files still need to be created and placed in docs/diagrams/ before this part can be filmed. They are dfd_level_0.png, dfd_level_1.png, flowchart_log_call.png, flowchart_escalation.png, and flowchart_resolution.png.
+
+GO TO: `docs/diagrams/dfd_level_0.png`.
+
+SHOW: the level 0 data flow diagram, one process bubble in the middle labelled Helpdesk System, with four external entities around it, caller, operator, specialist, and analyst.
+
+SAY:
+
+"This is the level 0 data flow diagram, the whole system as one box. The caller reports a problem and gets a problem number back. The operator logs calls, looks things up, and escalates. The specialist works their assigned queue and resolves problems. The analyst pulls reports out. Everything in between those four is the one box in the middle."
+
+GO TO: `docs/diagrams/dfd_level_1.png`.
+
+SHOW: the level 1 data flow diagram, five processes, log a call, look up history, escalate, resolve, and report, with data stores for the main tables.
+
+SAY:
+
+"This is the same system opened up one level. Five processes. Log a call writes into the problem and call log stores and reads from employee and equipment. Look up history reads problem and call log for the Knowledge Lookup screen. Escalate reads problem type and helpdesk staff to find a specialist, then writes back to problem. Resolve writes to problem and call log. And report reads from problem, equipment, and helpdesk staff to produce the four management views."
+
+GO TO: `docs/diagrams/flowchart_log_call.png`.
+
+SHOW: the flowchart for logging a new call.
+
+SAY:
+
+"This flowchart follows sp_log_new_call, the procedure I will walk through properly in a minute. The operator enters a caller id and a serial number, the system looks both up, the operator picks a problem type and priority and writes a note, and on submit the database starts a transaction, inserts the problem row, inserts the first call log row, builds the problem number, and commits. That number comes straight back to the operator."
+
+GO TO: `docs/diagrams/flowchart_escalation.png`.
+
+SHOW: the flowchart for escalation.
+
+SAY:
+
+"This one follows fn_find_specialist and sp_assign_least_loaded together, since they always run as a pair. The system reads the problem's current type, then climbs the type hierarchy looking for a level with an active specialist. If nothing in the whole chain has one, the problem is left unassigned and the operator is told to escalate manually. If one is found, every qualified specialist at that level is ranked by how many open problems they already have, ties broken by whoever was assigned longest ago, and the least loaded one is written onto the problem."
+
+GO TO: `docs/diagrams/flowchart_resolution.png`.
+
+SHOW: the flowchart for resolving a problem.
+
+SAY:
+
+"And this one follows sp_resolve_problem and the trigger that runs alongside it. The specialist submits resolution notes, the procedure updates the problem to RESOLVED, and before that row is actually written, a trigger fires and works out minutes_to_resolve from the gap between when it was logged and when it was resolved. A second trigger then records the status change in the audit log, and a follow up call log row is written noting how it was resolved."
+
+---
+
+## 3. The schema
 
 Target: 2 minutes.
 
@@ -48,7 +96,7 @@ Last, audit_log, lines 219 to 228. This table is never written to directly by th
 
 ---
 
-## 3. Indexes
+## 4. Indexes
 
 Target: 45 seconds.
 
@@ -62,7 +110,7 @@ SAY:
 
 ---
 
-## 4. The views
+## 5. The views
 
 Target: 1 minute.
 
@@ -84,7 +132,43 @@ Line 89, vw_problem_type_frequency. Where is training needed. This one uses a se
 
 ---
 
-## 5. The procedures
+## 6. The query set
+
+Target: 1 minute 30 seconds.
+
+GO TO: `db/queries/`, showing the folder listing of all seven files.
+
+SHOW: the seven files in the folder.
+
+SAY:
+
+"Alongside the views, there are seven standalone queries, each one written to show off a different piece of SQL. Let me go through them quickly.
+
+File 01, resolved problems, joins six tables with an inner join, and returns full resolution detail, who called, from which department, on what equipment, resolved by which specialist. Inner join is correct here because a resolved or closed problem is always assigned by that point, so every join is expected to match.
+
+File 02, open problems, is almost the same query but with a left join instead, because an open problem can legitimately have no specialist assigned yet, and a left join is the only way to keep that row instead of dropping it.
+
+File 03, overloaded specialists, groups problems by specialist and counts them, then uses a having clause to keep only the specialists whose count is above the company wide average, which is itself worked out with a subquery.
+
+File 04, equipment above average for its type, uses a correlated subquery, the inner query re-runs for every row of the outer query, comparing each piece of equipment's own problem count against the average for other equipment of the same type.
+
+File 05 is a recursive walk down the problem type tree, the opposite direction to the one inside fn_find_specialist, building a readable path like Hardware, then Laptop Issues, then Screen Damage.
+
+File 06 is a left join that finds every piece of equipment with an expired licence or no licence at all.
+
+And file 07 is a three statement update and delete pair, run directly against the seed data, that shows the two referential actions in the schema actually working, a cascade delete on software licence, and a restrict that blocks deleting equipment a problem still points to."
+
+GO TO: a terminal, running query 05 against the database.
+
+SHOW: run `mysql -u root -p manzaneque_helpdesk < db/queries/05_problem_type_hierarchy_walk.sql` and let the real output print.
+
+SAY:
+
+"Let me actually run one of these, so you can see real output rather than just the SQL. This is file 05, the recursive hierarchy walk. Twenty two rows, one per problem type, each one showing its depth and its full path from the top level category down."
+
+---
+
+## 7. The procedures
 
 Target: 3 minutes 15 seconds. This is the most important part of the video, take your time here.
 
@@ -114,7 +198,7 @@ Last, lines 168 to 193, sp_resolve_problem. It updates the problem to RESOLVED a
 
 ---
 
-## 6. The triggers
+## 8. The triggers
 
 Target: 45 seconds.
 
@@ -132,7 +216,7 @@ Lines 32 to 50, trg_problem_after_update. This writes rows into audit_log whenev
 
 ---
 
-## 7. Security
+## 9. Security
 
 Target: 1 minute 30 seconds.
 
@@ -172,7 +256,7 @@ SAY:
 
 ---
 
-## 8. The backend layers
+## 10. The backend layers
 
 Target: 1 minute.
 
@@ -202,7 +286,7 @@ SAY:
 
 ---
 
-## 9. Validation
+## 11. Validation
 
 Target: 45 seconds.
 
@@ -232,7 +316,7 @@ SAY:
 
 ---
 
-## 10. The frontend
+## 12. The frontend
 
 Target: 30 seconds.
 
@@ -246,7 +330,7 @@ SAY:
 
 ---
 
-## 11. Live demo
+## 13. Live demo
 
 Target: 2 minutes.
 
@@ -300,7 +384,7 @@ SAY:
 
 ---
 
-## 12. Close
+## 14. Close
 
 Target: 30 seconds.
 
@@ -310,4 +394,4 @@ SHOW: scroll through both files briefly.
 
 SAY:
 
-"Last thing. There are backup and restore scripts, they take a timestamped dump of the database and can restore it again, which I have tested against the real database. If I were to keep improving this, the next thing I would do is capture actual EXPLAIN output on the two heaviest report queries, to show the indexes are doing what I claim they are doing. That is the one piece of evidence I have not gathered yet. That is the system, thank you for watching."
+"Last thing. There are backup and restore scripts, they take a timestamped dump of the database and can restore it again, which I have tested against the real database. If I were to keep improving this, the next thing I would add is archiving, moving problems that have been closed for a long time, say a year, out of the main problem table and into an archive table, so the live table stays small and fast as the company keeps using this for years. That is the system, thank you for watching."
