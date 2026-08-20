@@ -22,13 +22,57 @@ to an environment where this session can run MySQL directly.
    archived after the app's tracked lifecycle. `IN_PROGRESS` is likewise not automated by any
    trigger or procedure; `sp_assign_least_loaded` sets `ASSIGNED`, `sp_resolve_problem` sets
    `RESOLVED` directly. Seed data will include some `IN_PROGRESS` rows for realism only.
+4. Seeded 13 `helpdesk_staff` rows, not the 12 itemised in §3.7 (6 operators, 5 specialists,
+   1 analyst) — added one `ADMIN` account (`employee_id` 13), since the Admin screen/role in
+   §4.2 needs a working login and none was allocated in the volume count.
 
-## Phase status
+## Phase 3 output (seed + queries)
+
+Seed data is **generated**, not hand-written: `db/seed_generator/generate_seed.js` is a
+deterministic Node script (fixed PRNG seed `20260220`) that writes `db/07_seed.sql`. Re-running
+it reproduces the file byte-for-byte. Row counts from the last generation:
+
+| Table | Rows |
+|---|---|
+| department | 6 |
+| job_title | 12 |
+| employee | 45 |
+| equipment_type | 8 |
+| equipment | 70 |
+| software | 15 |
+| software_licence | 90 |
+| problem_type | 22 |
+| helpdesk_staff | 13 (see assumption 4) |
+| specialist_expertise | 20 |
+| problem | 250 (18 OPEN / 11 ASSIGNED / 8 IN_PROGRESS / 33 RESOLVED / 180 CLOSED) |
+| call_log | 448 |
+| audit_log | 0 (trigger-populated only; INSERT does not fire AFTER UPDATE) |
+
+Fallback and least-loaded logic: the generator contains a JS mirror of
+`fn_find_specialist`/`sp_assign_least_loaded` (same walk-up-the-hierarchy, same
+fewest-open-problems-then-earliest-last-assignment tie-break) so the seed data's
+`assigned_staff_id` values are internally consistent with what the real SQL routines should
+produce. Two deliberate no-specialist-at-this-level branches are seeded to exercise the
+fallback: `problem_type_id 19` ("Screen Damage", 1-level fallback to parent `6` "Laptop
+Issues") and `problem_type_id 22` ("Account Locked", 2-level fallback to root `4` "Account &
+Access"). Confirmed by inspection of the generated SQL: problems of type 19 are assigned to
+staff 7 (who covers type 6), problems of type 22 are assigned to staff 11 (who covers type 4).
+
+**This is evidence the algorithm is internally consistent, not proof the live MySQL
+`fn_find_specialist`/`sp_assign_least_loaded` produce the same result** — that requires
+actually running them, which this environment cannot do (see Environment note above).
+
+Seven queries in `db/queries/`, covering: multi-table INNER JOIN (6 tables), multi-table LEFT
+JOIN (6 tables), GROUP BY + HAVING, a correlated subquery, `WITH RECURSIVE` (a second,
+independent recursive walk — top-down tree rendering — distinct from `fn_find_specialist`'s
+bottom-up walk), a LEFT-JOIN licence-validity query, and an UPDATE/DELETE pair demonstrating
+CASCADE (software_licence) vs RESTRICT (problem) referential actions.
 
 - [x] Phase 1 — Scaffold and schema (`db/01_schema.sql`, `db/02_indexes.sql`) — committed
 - [x] Phase 2 — Routines and roles (`db/03_views.sql`, `db/04_procedures.sql`,
       `db/05_triggers.sql`, `db/06_roles.sql`) — committed
-- [ ] Phase 3 — Seed data and queries — **IN PROGRESS, will stop for user confirmation**
+- [x] Phase 3 — Seed data and queries — SQL written and generator-verified; **awaiting
+      user's live-DB run for the actual checkpoint proof** before Phase 4 starts
 - [ ] Phase 4 — Backend foundation
 - [ ] Phase 5 — Reference data and lookups
 - [ ] Phase 6 — Problem workflow and reports — **CHECKPOINT**
