@@ -24,7 +24,7 @@ SAY:
 
 Target: 1 minute 30 seconds.
 
-Note before recording this section: these five diagram files still need to be created and placed in docs/diagrams/ before this part can be filmed. They are dfd_level_0.png, dfd_level_1.png, flowchart_log_call.png, flowchart_escalation.png, and flowchart_resolution.png.
+All five diagram files now exist in docs/diagrams/: dfd_level_0.png, dfd_level_1.png, flowchart_log_call.png, flowchart_escalation.png, and flowchart_resolution.png.
 
 GO TO: `docs/diagrams/dfd_level_0.png`.
 
