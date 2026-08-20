@@ -25,10 +25,10 @@ to an environment where this session can run MySQL directly.
 
 ## Phase status
 
-- [x] Phase 1 — Scaffold and schema (`db/01_schema.sql`, `db/02_indexes.sql`)
+- [x] Phase 1 — Scaffold and schema (`db/01_schema.sql`, `db/02_indexes.sql`) — committed
 - [x] Phase 2 — Routines and roles (`db/03_views.sql`, `db/04_procedures.sql`,
-      `db/05_triggers.sql`, `db/06_roles.sql`)
-- [ ] Phase 3 — Seed data and queries — **CHECKPOINT, awaiting user confirmation**
+      `db/05_triggers.sql`, `db/06_roles.sql`) — committed
+- [ ] Phase 3 — Seed data and queries — **IN PROGRESS, will stop for user confirmation**
 - [ ] Phase 4 — Backend foundation
 - [ ] Phase 5 — Reference data and lookups
 - [ ] Phase 6 — Problem workflow and reports — **CHECKPOINT**
