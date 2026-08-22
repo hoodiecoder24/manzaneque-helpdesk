@@ -2,13 +2,46 @@
 
 Resume point for a fresh session: read this, then `ARCHITECTURE.md` and `CLAUDE.md`.
 
-## Environment note
+## Environment note (updated — see below, this section is partly historical)
 
-The build environment has neither Docker nor a MySQL client installed, so SQL has been
-written and hand-reviewed for MySQL 8.0 correctness but **not executed**. Execution and the
-Phase 3 checkpoint output (row counts, query results) depend on the user running
-`docker-compose up` (or a local MySQL + the scripts) and reporting back, or granting access
-to an environment where this session can run MySQL directly.
+The original build sessions had neither Docker nor a MySQL client installed, so SQL was
+written and hand-reviewed for MySQL 8.0 correctness but not executed at first. That gap is
+now closed for the local-MySQL path: MySQL 8.0.46 Community Server was installed on the
+build machine, all seven `db/0*.sql` scripts were run against it in order, and the app was
+exercised live end to end (see "Live-DB verification" below). Docker itself remains
+unexercised — Docker Desktop cannot start on this machine because BIOS virtualisation
+(Intel VT-x) is disabled, which is a firmware setting outside this session's reach. Anyone
+with a working Docker install should still do at least a smoke-test run of that path (see
+`docs/TEST_PLAN.md` §5, "What is deliberately not covered").
+
+## Live-DB verification (done)
+
+The database has been run live and the application exercised against it end to end,
+across two separate sessions:
+
+- **First pass**: MySQL 8.0.46 installed locally, `.env` configured, all seven `db/0*.sql`
+  scripts run in order with zero errors. Row counts after seeding matched the Phase 3 table
+  below exactly (45 employees, 70 equipment, 250 problems, 448 call_log, 0 audit_log, etc).
+  The server was started against this live database and the full workflow was driven
+  through the real HTTP API: login (`operator1`), caller lookup, equipment/licence lookup,
+  `sp_log_new_call` (produced `PR-000251`), `sp_assign_least_loaded` (correctly assigned
+  staff 11 for problem type 4, matching the seed generator's independent prediction),
+  `sp_resolve_problem`, and the `audit_log` trigger (3 rows, matching the 3 tracked field
+  changes on that one problem). All four `vw_*` report views returned real, sensible data
+  through `GET /api/reports/*`.
+- **Second pass**: further manual/browser testing after the first pass added more rows.
+  `db/maintenance/backup.sh` was run for real and produced
+  `db/maintenance/backups/manzaneque_helpdesk_20260822_130628.sql` (148,106 bytes) — a
+  genuine `mysqldump` output, not a placeholder. At the time of that backup, the live
+  database held 251 problems, 450 call_log rows, and 3 audit_log rows (250/448/0 seed plus
+  the cumulative effect of both testing passes), confirmed by direct SQL row counts, not by
+  reading the UI. Every reference/static table (department, job_title, employee,
+  equipment_type, equipment, software, software_licence, problem_type, helpdesk_staff,
+  specialist_expertise) still matched its exact seeded count.
+
+This supersedes the "awaiting user's live-DB run" language that used to sit against
+Phases 3, 6 and 8 below — those phases' checkpoints are now backed by a real run, not just
+generator-side self-consistency checks.
 
 ## Assumptions in force (ARCHITECTURE.md was silent on these)
 
@@ -71,8 +104,9 @@ CASCADE (software_licence) vs RESTRICT (problem) referential actions.
 - [x] Phase 1 — Scaffold and schema (`db/01_schema.sql`, `db/02_indexes.sql`) — committed
 - [x] Phase 2 — Routines and roles (`db/03_views.sql`, `db/04_procedures.sql`,
       `db/05_triggers.sql`, `db/06_roles.sql`) — committed
-- [x] Phase 3 — Seed data and queries — SQL written and generator-verified; **awaiting
-      user's live-DB run for the actual checkpoint proof**
+- [x] Phase 3 — Seed data and queries — SQL written and generator-verified, **now also
+      confirmed by a live run** — row counts matched exactly, see "Live-DB verification"
+      above
 - [x] Phase 4 — Backend foundation — Express app, JWT auth, RBAC middleware, Zod
       validation, central error handler, connection pool against `hd_app` — committed
 - [x] Phase 5 — Reference data and lookups — departments/job-titles/equipment-types/
@@ -80,7 +114,7 @@ CASCADE (software_licence) vs RESTRICT (problem) referential actions.
       lookup for Log a Call — committed
 - [x] Phase 6 — Problem workflow and reports — `sp_log_new_call`/`sp_assign_least_loaded`/
       `sp_resolve_problem` wired end-to-end, knowledge lookup, four report endpoints over
-      the views — **CHECKPOINT — awaiting live-DB verification, see below**
+      the views — **CHECKPOINT — live-DB verified**, see "Live-DB verification" above
 - [x] Phase 7 — Frontend — seven screens (Login, Log a Call, Problem List, Problem Detail
       + escalation modal, Knowledge Lookup, Reports, Admin), React Router, role-gated nav
       — committed; client builds clean (`npm run build`)
@@ -88,48 +122,48 @@ CASCADE (software_licence) vs RESTRICT (problem) referential actions.
       limit already in Phase 4; added `db/maintenance/{backup,restore}.sh`, `db/dump.sql`
       (concatenated 01–07, regenerate via `cat db/0[1-7]_*.sql > db/dump.sql`), Dockerfiles
       for `server`/`client`, `docker-compose.yml` extended with `server`+`web` services,
-      root `README.md` — **FINAL CHECKPOINT — awaiting live-DB and browser verification,
-      see below**
+      root `README.md` — **FINAL CHECKPOINT — live-DB verified, `backup.sh` run for real**,
+      see "Live-DB verification" above. Docker path itself still unexercised (see
+      Environment note).
+- [x] Phase 9 — Testing document (Deliverable 3, P4/M4) — `docs/TEST_PLAN.md` written
+      against the actual built schema, validators and routes (not the earlier design
+      document); ~100 test cases across authentication/RBAC, three-level validation,
+      Log a Call, escalation, resolution, audit, referential integrity, the P3 query set,
+      M3 reports, security, maintenance and usability, plus a traceability matrix and an
+      M4 test-data-justification section. `docs/evidence/README.md` sets the evidence
+      filename convention. Documents one real implementation gap found while writing it:
+      `ARCHITECTURE.md` §4.1 describes "manual override" on the escalation endpoint, but
+      the built route accepts no staff-selection parameter — see `TEST_PLAN.md` TC-ESC-07.
+      **Not yet executed** — the document is the plan; results are filled in by the user
+      during the actual test pass.
 
-## What is verified vs. not (this environment has no Docker and no MySQL client)
+## What is verified vs. not
 
-Verified in this session:
-- `server` boots cleanly (`node src/app.js` loads with no errors) and its HTTP layer works
-  correctly *without* a database: health check, 401 on missing auth, 400 with field errors
-  on bad login body, and RBAC/validation middleware ordering, all checked with live `curl`
-  requests against a running instance.
-- `client` installs and `npm run build` produces a clean production bundle with no
-  compile/import errors.
-- The seed password hash (`db/seed_generator/generate_seed.js`) verifies against
-  `bcryptjs.compare('Password123!', hash)` — login will work once the seed data is loaded.
-- `docker compose config` was **not** run (no Docker in this environment) — the compose
-  file, both Dockerfiles and `client/nginx.conf` are hand-reviewed but not executed.
+Verified, against a live local MySQL 8.0.46 database (see "Live-DB verification" above):
+login for at least one account per role, caller/equipment lookup, licence validity display,
+`sp_log_new_call`, `sp_assign_least_loaded` (including a real fallback resolution to staff
+11), `sp_resolve_problem`, the `trg_problem_before_update`/`trg_problem_after_update`
+triggers, all four report views, the restricted `hd_app` connection user, and
+`db/maintenance/backup.sh` producing a real dump file. `client` builds cleanly
+(`npm run build`) and was driven through the Vite dev server during this testing.
 
-**Not verified — needs the user to run it**: every endpoint that touches MySQL (all of
-Phase 5/6's actual behaviour), the full `docker compose up --build` path end-to-end, and
-the app in a browser (README §"Logging in" walks through all four roles). This is the same
-gap noted for Phase 3 — nothing in Phases 4–8 changes that; it compounds it, since the
-whole backend is now new code that has only been syntax/route-checked, never run against
-real rows.
+**Still not verified**: the Docker path end-to-end (blocked by this machine's BIOS
+virtualisation setting, not by anything in the code — see Environment note), `restore.sh`
+(the backup exists but has not yet been restored into a clean database and row-count
+checked), `EXPLAIN` plan comparisons with/without `db/02_indexes.sql`, and the bulk of the
+Admin CRUD screens (employee/equipment/problem-type create/update/delete, and the
+RESTRICT/SET NULL/CASCADE referential-action behaviours specifically). `docs/TEST_PLAN.md`
+now has a concrete, numbered test case for every one of these (TC-MNT-02, TC-MNT-03/04,
+TC-REF-01 through TC-REF-08) — that document is the path to closing this list, not a
+repeat of this section.
 
-## Suggested verification pass (for whoever has Docker/MySQL)
+## Suggested verification pass
 
-1. `docker compose up --build`, wait for `server` to report listening.
-2. Log in as `operator1` / `Password123!`, log a call end-to-end (caller lookup, serial
-   lookup showing licence validity, cascading problem-type picker, submit, read back the
-   problem number).
-3. Log in as `operator1` again on a fresh/unassigned problem, escalate via the modal —
-   confirm it lands on the seeded no-specialist-at-this-level fallback cases (problem types
-   19 and 22, per the Phase 3 seed notes above) and assigns correctly.
-3a. As `specialist1..5`, confirm the Problem List defaults to that specialist's own
-   `ASSIGNED` queue, and resolve a problem.
-4. As `analyst1`, check all four report tabs render and the open-by-age date filter works.
-5. As `admin1`, CRUD an employee, an equipment item and a problem type; confirm deleting a
-   referenced row 409s (FK RESTRICT) rather than 500ing.
-6. `db/maintenance/backup.sh` then `restore.sh` against the backup it produces — capture
-   both as evidence per ARCHITECTURE.md §3.8.
-7. `EXPLAIN` the two heaviest report queries before/after `db/02_indexes.sql`'s indexes —
-   this still needs a live database and has not been done in any session so far.
+Superseded by `docs/TEST_PLAN.md` — that document is the actual, numbered test plan
+(TC-AUTH, TC-VAL, TC-LOG, TC-ESC, TC-RES, TC-AUD, TC-REF, TC-QRY, TC-RPT, TC-SEC, TC-MNT,
+TC-USE) and should be used instead of this list from here on. §2 of that document repeats
+the environment setup steps in more detail (including how to reset seed data between runs)
+and §6 is a traceability matrix confirming nothing here is left uncovered.
 
 ## Design notes for whoever resumes
 
