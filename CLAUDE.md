@@ -12,8 +12,8 @@ specification. These rules govern every change made in this repository.
    maintenance scripts.
 4. **Comment SQL for a human marker.** Every view, procedure, trigger, index and standalone
    query carries a header comment stating its purpose.
-5. **It must run on a fresh machine.** Assume the assessor has Docker, or has MySQL and Node
-   and nothing else. Both paths work from the README alone.
+5. **It must run on a fresh machine.** Assume the assessor has MySQL 8.0 and Node and
+   nothing else. The README alone is enough.
 6. **No stubs.** Anything reported as complete works against real seeded data.
 7. **Ask before assuming.** If the specification is ambiguous on something affecting the
    schema or a business rule, stop and ask.

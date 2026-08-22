@@ -54,15 +54,10 @@ where it affects a test case).
 
 ### Bringing the stack up
 
-Two supported paths, both documented in `README.md`:
-
-- **Docker**: `docker compose up --build`. Not exercised in this repository's own build
-  session — the build machine's BIOS has virtualisation disabled — but the compose file,
-  `server/Dockerfile` and `client/Dockerfile` are in place for a machine that has it enabled.
-- **Local MySQL + Node** (the path actually used to produce the evidence this test plan
-  cites): run `db/01_schema.sql` through `db/07_seed.sql` in order against a database named
-  `manzaneque_helpdesk`, then `cd server && npm install && npm start`, then
-  `cd client && npm install && npm run dev`.
+The single supported path, documented in full in `README.md`: run `db/01_schema.sql`
+through `db/07_seed.sql` in order against a database named `manzaneque_helpdesk`, then
+`cd server && npm install && npm start`, then `cd client && npm install && npm run dev`.
+This is the path actually used to produce the evidence this test plan cites.
 
 ### Seed data state these tests assume
 
@@ -79,12 +74,6 @@ integrity SET NULL/CASCADE tests, the maintenance restore test). Those sections 
 recommend running last, or against a disposable copy.
 
 ### Resetting between runs
-
-```bash
-docker compose down -v      # Docker path: drops the named volume, next `up` reseeds from scratch
-```
-
-For the local MySQL path (no Docker volume to drop):
 
 ```bash
 mysql -u root -p -e "DROP DATABASE manzaneque_helpdesk; CREATE DATABASE manzaneque_helpdesk"
@@ -438,13 +427,9 @@ vague "bad input":
   is worth noting as a design decision, but proving it under real concurrent load would need
   a load-testing harness this plan does not otherwise justify building. This is flagged as a
   known residual risk rather than silently ignored.
-- **Docker path execution.** As recorded in `PROGRESS.md`, the build machine used for this
-  project cannot run Docker Desktop (BIOS virtualisation disabled), so every test in this
-  document assumes the local MySQL + Node path. The compose file and Dockerfiles are
-  reviewed but unexercised; anyone with a working Docker installation should re-run at least
-  TC-AUTH-01 and TC-LOG-09 against the Docker path once, as a smoke test that the container
-  wiring itself works, before relying on this test plan's results as evidence for that path
-  too.
+- **Containerisation.** Removed from this project's scope entirely (see `PROGRESS.md`'s
+  assumptions) — no P2/P3/M2/M3/M4 criterion asks for it, and it was never executed on any
+  machine used to build this project. No container-based smoke test is needed.
 
 ---
 

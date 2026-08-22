@@ -15,7 +15,7 @@ Scope is set by the assessment criteria: **P2** (working system with UI, output 
 | Auth | JWT + bcrypt (cost 12) | M2 security. |
 | Validation | Zod (server) + React (client) + DB constraints | Three enforcement levels — P2 asks for validation evidence. |
 | Frontend | React 18 + Vite, plain CSS | No framework overhead. |
-| Packaging | Docker Compose + a plain SQL dump | The assessor must be able to run it. Two routes in. |
+| Packaging | A plain SQL dump | The assessor must be able to run it against their own MySQL 8.0 + Node install. |
 
 **Stance:** aggregation goes in views, multi-step operations go in stored procedures, derived values come from triggers. Pulling rows into JavaScript and computing there forfeits the marks this build exists to earn.
 
@@ -28,7 +28,6 @@ manzaneque-helpdesk/
 ├── CLAUDE.md                # build rules
 ├── ARCHITECTURE.md          # this file
 ├── README.md                # assessor setup instructions
-├── docker-compose.yml
 ├── .env.example
 │
 ├── db/

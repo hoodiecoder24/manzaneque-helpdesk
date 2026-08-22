@@ -4,15 +4,11 @@ Resume point for a fresh session: read this, then `ARCHITECTURE.md` and `CLAUDE.
 
 ## Environment note (updated — see below, this section is partly historical)
 
-The original build sessions had neither Docker nor a MySQL client installed, so SQL was
-written and hand-reviewed for MySQL 8.0 correctness but not executed at first. That gap is
-now closed for the local-MySQL path: MySQL 8.0.46 Community Server was installed on the
-build machine, all seven `db/0*.sql` scripts were run against it in order, and the app was
-exercised live end to end (see "Live-DB verification" below). Docker itself remains
-unexercised — Docker Desktop cannot start on this machine because BIOS virtualisation
-(Intel VT-x) is disabled, which is a firmware setting outside this session's reach. Anyone
-with a working Docker install should still do at least a smoke-test run of that path (see
-`docs/TEST_PLAN.md` §5, "What is deliberately not covered").
+The original build sessions had no MySQL client installed, so SQL was written and
+hand-reviewed for MySQL 8.0 correctness but not executed at first. That gap is now closed:
+MySQL 8.0.46 Community Server was installed on the build machine, all seven `db/0*.sql`
+scripts were run against it in order, and the app was exercised live end to end (see
+"Live-DB verification" below).
 
 ## Live-DB verification (done)
 
@@ -58,6 +54,15 @@ generator-side self-consistency checks.
 4. Seeded 13 `helpdesk_staff` rows, not the 12 itemised in §3.7 (6 operators, 5 specialists,
    1 analyst) — added one `ADMIN` account (`employee_id` 13), since the Admin screen/role in
    §4.2 needs a working login and none was allocated in the volume count.
+5. Containerisation (Docker Compose, a `server` and `client` Dockerfile, nginx as a reverse
+   proxy) was in the original architecture's packaging plan and was built in Phase 8, but
+   was never actually executed on any machine used for this project — the one available
+   build machine cannot start Docker Desktop (BIOS virtualisation disabled). Rather than
+   ship an unverified setup path in the README alongside a verified one, it was removed
+   deliberately: `docker-compose.yml`, both Dockerfiles, `client/nginx.conf` and every
+   reference to them across the docs were deleted. No P2/P3/M2/M3/M4 criterion asks for
+   containerisation; the local MySQL 8.0 + Node path is the single supported route now, and
+   it is the one this document's live-DB verification actually exercised.
 
 ## Phase 3 output (seed + queries)
 
@@ -120,11 +125,10 @@ CASCADE (software_licence) vs RESTRICT (problem) referential actions.
       — committed; client builds clean (`npm run build`)
 - [x] Phase 8 — Hardening, maintenance, packaging — Helmet/CORS allowlist/login rate
       limit already in Phase 4; added `db/maintenance/{backup,restore}.sh`, `db/dump.sql`
-      (concatenated 01–07, regenerate via `cat db/0[1-7]_*.sql > db/dump.sql`), Dockerfiles
-      for `server`/`client`, `docker-compose.yml` extended with `server`+`web` services,
-      root `README.md` — **FINAL CHECKPOINT — live-DB verified, `backup.sh` run for real**,
-      see "Live-DB verification" above. Docker path itself still unexercised (see
-      Environment note).
+      (concatenated 01–07, regenerate via `cat db/0[1-7]_*.sql > db/dump.sql`), root
+      `README.md` — **FINAL CHECKPOINT — live-DB verified, `backup.sh` run for real**, see
+      "Live-DB verification" above. (Containerisation was built here too, then removed —
+      see assumption 5.)
 - [x] Phase 9 — Testing document (Deliverable 3, P4/M4) — `docs/TEST_PLAN.md` written
       against the actual built schema, validators and routes (not the earlier design
       document); ~100 test cases across authentication/RBAC, three-level validation,
@@ -147,10 +151,9 @@ triggers, all four report views, the restricted `hd_app` connection user, and
 `db/maintenance/backup.sh` producing a real dump file. `client` builds cleanly
 (`npm run build`) and was driven through the Vite dev server during this testing.
 
-**Still not verified**: the Docker path end-to-end (blocked by this machine's BIOS
-virtualisation setting, not by anything in the code — see Environment note), `restore.sh`
-(the backup exists but has not yet been restored into a clean database and row-count
-checked), `EXPLAIN` plan comparisons with/without `db/02_indexes.sql`, and the bulk of the
+**Still not verified**: `restore.sh` (the backup exists but has not yet been restored into
+a clean database and row-count checked), `EXPLAIN` plan comparisons with/without
+`db/02_indexes.sql`, and the bulk of the
 Admin CRUD screens (employee/equipment/problem-type create/update/delete, and the
 RESTRICT/SET NULL/CASCADE referential-action behaviours specifically). `docs/TEST_PLAN.md`
 now has a concrete, numbered test case for every one of these (TC-MNT-02, TC-MNT-03/04,

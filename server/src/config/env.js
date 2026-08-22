@@ -1,7 +1,7 @@
 // Loads and validates process env once at startup so a missing variable
 // fails fast instead of surfacing as a cryptic error mid-request. The
-// single .env lives at the repo root (shared with docker-compose), not
-// inside server/, so its path is resolved relative to this file.
+// single .env lives at the repo root, not inside server/, so its path is
+// resolved relative to this file.
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

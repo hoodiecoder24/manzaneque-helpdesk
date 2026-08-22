@@ -19,12 +19,6 @@ fi
 # shellcheck disable=SC1090
 set -a; source "$ROOT_DIR/.env"; set +a
 
-if docker compose -f "$ROOT_DIR/docker-compose.yml" ps db >/dev/null 2>&1 && \
-   [ "$(docker compose -f "$ROOT_DIR/docker-compose.yml" ps -q db)" != "" ]; then
-    docker compose -f "$ROOT_DIR/docker-compose.yml" exec -T db \
-        mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$DB_NAME" < "$BACKUP_FILE"
-else
-    mysql -h "$DB_HOST" -P "$DB_PORT" -u root -p"$MYSQL_ROOT_PASSWORD" "$DB_NAME" < "$BACKUP_FILE"
-fi
+mysql -h "$DB_HOST" -P "$DB_PORT" -u root -p"$MYSQL_ROOT_PASSWORD" "$DB_NAME" < "$BACKUP_FILE"
 
 echo "Restored $BACKUP_FILE into $DB_NAME"

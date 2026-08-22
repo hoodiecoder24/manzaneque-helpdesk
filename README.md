@@ -5,10 +5,7 @@ status and assumptions made where the brief was silent.
 
 ## Prerequisites
 
-Pick **one** path.
-
-- **Docker path**: Docker Desktop (or Docker Engine + Compose plugin). Nothing else.
-- **Local path**: MySQL 8.0 and Node.js 20+.
+MySQL 8.0 and Node.js 20+. Nothing else.
 
 ## 1. Configure environment
 
@@ -16,42 +13,16 @@ Pick **one** path.
 cp .env.example .env
 ```
 
-Defaults work as-is for both paths. If you change `MYSQL_ROOT_PASSWORD` or `DB_APP_PASSWORD`,
-see the note in `db/06_roles.sql` — that script only runs automatically on the database
-container's *first* initialisation, so a later `.env` edit alone will not update the
-`hd_app` MySQL user's password; re-run `06_roles.sql`'s `CREATE USER`/`ALTER USER` by hand
-against the running database if you change it after first boot.
+Defaults work as-is. If you change `DB_APP_PASSWORD` after the first time you run
+`db/06_roles.sql`, re-run that script's `CREATE USER`/`ALTER USER` statements by hand
+against the running database — a later `.env` edit alone does not update the `hd_app`
+MySQL user's actual password.
 
-## 2. Docker path (recommended)
-
-```bash
-docker compose up --build
-```
-
-This starts four containers:
-
-| Service | URL | Purpose |
-|---|---|---|
-| `db` | `localhost:3306` | MySQL 8.0. `./db/*.sql` runs automatically on first init, in filename order (schema → indexes → views → procedures → triggers → roles → seed). |
-| `adminer` | http://localhost:8080 | Browse the database. Server: `db`, matching credentials from `.env`. |
-| `server` | http://localhost:4000 | The API. `GET /api/health` should return `{"status":"ok"}`. |
-| `web` | http://localhost:5173 | The React app. |
-
-First boot takes longer while MySQL initialises and runs the seed scripts — `server` waits
-for the database healthcheck before starting. Open http://localhost:5173 once it's up.
-
-To reset entirely (drop all data and re-seed from scratch):
+## 2. Database
 
 ```bash
-docker compose down -v
-docker compose up --build
-```
-
-## 3. Local path (MySQL + Node, no Docker)
-
-```bash
-# 1. Create the database and run the SQL in order (root/admin privileges needed
-#    for 06_roles.sql, which creates the hd_app user and roles).
+# Create the database and run the SQL in order (root/admin privileges needed
+# for 06_roles.sql, which creates the hd_app user and roles).
 mysql -u root -p -e "CREATE DATABASE manzaneque_helpdesk"
 mysql -u root -p manzaneque_helpdesk < db/01_schema.sql
 mysql -u root -p manzaneque_helpdesk < db/02_indexes.sql
@@ -63,17 +34,33 @@ mysql -u root -p manzaneque_helpdesk < db/07_seed.sql
 
 # or, equivalently, all at once:
 mysql -u root -p manzaneque_helpdesk < db/dump.sql
-
-# 2. Backend
-cd server && npm install && npm start   # http://localhost:4000
-
-# 3. Frontend (separate terminal)
-cd client && npm install && npm run dev # http://localhost:5173
 ```
 
 `.env`'s `DB_HOST=localhost` / `DB_PORT=3306` already target a local MySQL install — no
-changes needed for this path (the Docker path overrides these two at the container level;
-see `docker-compose.yml`).
+changes needed.
+
+## 3. Backend
+
+```bash
+cd server && npm install && npm start   # http://localhost:4000
+```
+
+`GET /api/health` should return `{"status":"ok"}`.
+
+## 4. Frontend
+
+```bash
+cd client && npm install && npm run dev # http://localhost:5173
+```
+
+Open http://localhost:5173 once both are running.
+
+## Resetting the database
+
+```bash
+mysql -u root -p -e "DROP DATABASE manzaneque_helpdesk; CREATE DATABASE manzaneque_helpdesk"
+mysql -u root -p manzaneque_helpdesk < db/dump.sql
+```
 
 ## Logging in
 
@@ -111,8 +98,8 @@ db/maintenance/backup.sh                    # timestamped mysqldump -> db/mainte
 db/maintenance/restore.sh <path-to-backup>   # restore a backup
 ```
 
-Both scripts detect whether the Docker `db` container is running and target it, or fall
-back to `.env`'s `DB_HOST`/`DB_PORT` for a local install.
+Both scripts read `DB_HOST`/`DB_PORT`/`MYSQL_ROOT_PASSWORD`/`DB_NAME` from `.env` and
+connect directly to the local MySQL install.
 
 ## Running the query set (P3 evidence)
 
